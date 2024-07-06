@@ -87,6 +87,34 @@ app.get("/api/cloud-provider", async (req, res) => {
   }
 });
 
+// クラウドプロバイダー削除エンドポイント
+app.delete("/api/cloud-provider/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query("DELETE FROM cloud_provider WHERE provider_id = $1", [id]);
+    res.status(204).end();
+  } catch (error) {
+    console.error("Error deleting cloud provider:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// クラウドプロバイダー更新エンドポイント
+app.put("/api/cloud-provider/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, description } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE cloud_provider SET name = $1, description = $2 WHERE provider_id = $3 RETURNING *",
+      [name, description, id]
+    );
+    res.status(200).json(result.rows[0]);
+  } catch (error) {
+    console.error("Error updating cloud provider:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // データセンターの作成
 app.post("/api/data-center", async (req, res) => {
   const { name, location, provider_id } = req.body;
@@ -115,6 +143,43 @@ app.get("/api/data-center", async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// データセンターの更新エンドポイント
+app.put("/api/data-centers/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, location, provider_id } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE data_center SET name = $1, location = $2, provider_id = $3 WHERE id = $4 RETURNING *",
+      [name, location, provider_id, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).send("Data center not found");
+    }
+    res.status(200).json(result.rows[0]);
+  } catch (err) {
+    console.error("Error updating data center:", err);
+    res.status(500).send("Server error");
+  }
+});
+
+// データセンターの削除エンドポイント
+app.delete("/api/data-centers/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "DELETE FROM data_center WHERE data_center_id = $1 RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).send("Data center not found");
+    }
+    res.status(200).json(result.rows[0]);
+  } catch (err) {
+    console.error("Error deleting data center:", err);
+    res.status(500).send("Server error");
   }
 });
 
