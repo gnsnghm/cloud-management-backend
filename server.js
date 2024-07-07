@@ -2,7 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const { Pool } = require("pg");
-const bcrypt = require("bcryptjs"); // bcryptjsのインポートを追加
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { provide } = require("vue");
 require("dotenv").config();
