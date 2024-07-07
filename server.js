@@ -117,8 +117,8 @@ app.put("/api/cloud-provider/:id", async (req, res) => {
 
 // データセンターの作成
 app.post("/api/data-center", async (req, res) => {
-  const { name, location, provider_id } = req.body;
-  const parsedProviderId = parseInt(provider_id, 10); // provider_idを整数に変換
+  const { name, location, cloud_provider_id } = req.body;
+  const parsedProviderId = parseInt(cloud_provider_id, 10); // provider_idを整数に変換
   console.log(parsedProviderId);
   if (isNaN(parsedProviderId)) {
     return res.status(400).json({ error: "Invalid provider_id" });
@@ -132,7 +132,7 @@ app.post("/api/data-center", async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error("Error creating data center:", error); // エラーメッセージをログに出力
-    res.status(500).json({ error: error.message });
+    // res.status(500).json({ error: error.message });
   }
 });
 
@@ -147,7 +147,7 @@ app.get("/api/data-center", async (req, res) => {
 });
 
 // データセンターの更新エンドポイント
-app.put("/api/data-centers/:id", async (req, res) => {
+app.put("/api/data-center/:id", async (req, res) => {
   const { id } = req.params;
   const { name, location, provider_id } = req.body;
   try {
@@ -166,20 +166,14 @@ app.put("/api/data-centers/:id", async (req, res) => {
 });
 
 // データセンターの削除エンドポイント
-app.delete("/api/data-centers/:id", async (req, res) => {
+app.delete("/api/data-center/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query(
-      "DELETE FROM data_center WHERE data_center_id = $1 RETURNING *",
-      [id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).send("Data center not found");
-    }
-    res.status(200).json(result.rows[0]);
-  } catch (err) {
-    console.error("Error deleting data center:", err);
-    res.status(500).send("Server error");
+    await pool.query("DELETE FROM data_center WHERE data_center_id = $1", [id]);
+    res.status(204).end();
+  } catch (error) {
+    console.error("Error deleting data center:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
