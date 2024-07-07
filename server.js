@@ -65,11 +65,11 @@ app.post("/api/login", async (req, res) => {
 
 // クラウドプロバイダ登録
 app.post("/api/cloud-provider", async (req, res) => {
-  const { name } = req.body;
+  const { name, description } = req.body;
   try {
     const result = await pool.query(
-      "INSERT INTO cloud_provider (name) VALUES ($1) RETURNING *",
-      [name]
+      "INSERT INTO cloud_provider (name, description) VALUES ($1, $2) RETURNING *",
+      [name, description]
     );
     res.json(result.rows[0]);
   } catch (error) {
@@ -215,6 +215,61 @@ app.get("/api/cloud-pool", async (req, res) => {
   } catch (error) {
     console.error("Error fetching cloud pools:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// クラウドプールの更新
+app.put("/api/cloud-pool/:id", async (req, res) => {
+  const { id } = req.params;
+  const {
+    name,
+    total_memory,
+    total_memory_unit_id,
+    total_cpu,
+    total_disk_capacity,
+    total_disk_unit_id,
+    data_center_id,
+  } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE cloud_pool SET name = $1, total_memory = $2, total_memory_unit_id = $3, total_cpu = $4, total_disk_capacity = $5, total_disk_unit_id = $6, data_center_id = $7 WHERE cloud_pool_id = $8 RETURNING *",
+      [
+        name,
+        total_memory,
+        total_memory_unit_id,
+        total_cpu,
+        total_disk_capacity,
+        total_disk_unit_id,
+        data_center_id,
+        id,
+      ]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Cloud pool not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// クラウドプールの削除
+app.delete("/api/cloud-pool/:id", async (req, res) => {
+  console.log("aaa");
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "DELETE FROM cloud_pool WHERE cloud_pool_id = $1 RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Cloud pool not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
