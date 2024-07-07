@@ -274,93 +274,142 @@ app.delete("/api/cloud-pool/:id", async (req, res) => {
 });
 
 // 仮想マシン登録
-app.post("/api/virtual-machine", async (req, res) => {
+app.post("/api/virtual-machines", async (req, res) => {
   const {
     name,
-    memory,
+    memory_size,
     memory_unit_id,
-    cpu,
-    disk_capacity,
-    disk_unit_id,
     cloud_pool_id,
     os_id,
     user_id,
-    partitions,
-    ip_addresses,
+    ipv4,
+    ipv6,
+    vlan,
+    disk_id,
+    disk_size,
+    disk_unit_id,
   } = req.body;
-
-  const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-
-    const virtualMachineResult = await client.query(
-      "INSERT INTO virtual_machine (name, memory, memory_unit_id, cpu, disk_capacity, disk_unit_id, cloud_pool_id, os_id, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+    const newVM = await pool.query(
+      "INSERT INTO virtual_machine (name, memory_size, memory_unit_id, cloud_pool_id, os_id, user_id, ipv4, ipv6, vlan, disk_id, disk_size, disk_unit_id) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *",
       [
         name,
-        memory,
+        memory_size,
         memory_unit_id,
-        cpu,
-        disk_capacity,
-        disk_unit_id,
         cloud_pool_id,
         os_id,
         user_id,
+        ipv4,
+        ipv6,
+        vlan,
+        disk_id,
+        disk_size,
+        disk_unit_id,
       ]
     );
-    const virtualMachineId = virtualMachineResult.rows[0].vm_id;
-
-    for (const partition of partitions) {
-      await client.query(
-        "INSERT INTO partition (disk_id, size, unit_id, filesystem) VALUES ($1, $2, $3, $4)",
-        [
-          virtualMachineId,
-          partition.size,
-          partition.unit_id,
-          partition.filesystem,
-        ]
-      );
-    }
-
-    for (const ip of ip_addresses) {
-      await client.query(
-        "INSERT INTO ip_address (vm_id, vlan, ipv4, ipv6) VALUES ($1, $2, $3, $4)",
-        [virtualMachineId, ip.vlan, ip.ipv4, ip.ipv6]
-      );
-    }
-
-    await client.query("COMMIT");
-    res.json(virtualMachineResult.rows[0]);
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Error creating virtual machine:", error);
-    res.status(500).json({ error: error.message });
-  } finally {
-    client.release();
+    res.json(newVM.rows[0]);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
 // 仮想マシン取得
-app.get("/api/virtual-machine", async (req, res) => {
+app.get("/api/virtual-machines", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM virtual_machine");
     res.json(result.rows);
   } catch (error) {
     console.error("Error fetching virtual machines:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).send("Server error");
+  }
+});
+
+// 仮想マシンの更新
+app.put("/api/virtual-machines/:id", async (req, res) => {
+  const { id } = req.params;
+  const {
+    name,
+    memory_size,
+    memory_unit_id,
+    disk_id,
+    disk_size,
+    disk_unit_id,
+    cloud_pool_id,
+    os_id,
+    user_id,
+    ipv4,
+    ipv6,
+    vlan,
+  } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE virtual_machine SET 
+        name = $1, 
+        memory_size = $2, 
+        memory_unit_id = $3, 
+        disk_id = $4, 
+        disk_size = $5, 
+        disk_unit_id = $6, 
+        cloud_pool_id = $7, 
+        os_id = $8, 
+        user_id = $9, 
+        ipv4 = $10, 
+        ipv6 = $11, 
+        vlan = $12 
+      WHERE vm_id = $13 RETURNING *`,
+      [
+        name,
+        memory_size,
+        memory_unit_id,
+        disk_id,
+        disk_size,
+        disk_unit_id,
+        cloud_pool_id,
+        os_id,
+        user_id,
+        ipv4,
+        ipv6,
+        vlan,
+        id,
+      ]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error updating virtual machine:", error);
+    res.status(500).send("Server error");
+  }
+});
+
+// 仮想マシンの削除
+app.delete("/api/virtual-machines/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await pool.query("DELETE FROM virtual_machine WHERE vm_id = $1", [id]);
+    res.sendStatus(204);
+  } catch (error) {
+    console.error("Error deleting virtual machine:", error);
+    res.status(500).send("Server error");
   }
 });
 
 // 利用ユーザ登録
 app.post("/api/users", async (req, res) => {
-  const { name, email } = req.body;
+  const { username, email } = req.body;
   try {
+    if (!username || !email) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
     const result = await pool.query(
       "INSERT INTO users (username, email) VALUES ($1, $2) RETURNING *",
-      [name, email]
+      [username, email]
     );
-    res.json(result.rows[0]);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -375,22 +424,61 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
-// 単位登録
-app.post("/api/unit", async (req, res) => {
-  const { name } = req.body;
+// ユーザの更新
+app.put("/api/users/:id", async (req, res) => {
+  const { id } = req.params;
+  const { username, email } = req.body;
+  console.log(req.body);
   try {
     const result = await pool.query(
-      "INSERT INTO unit (name) VALUES ($1) RETURNING *",
-      [name]
+      "UPDATE users SET username = $1, email = $2 WHERE user_id = $3 RETURNING *",
+      [username, email, id]
     );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
     res.json(result.rows[0]);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ユーザ削除
+app.delete("/api/users/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "DELETE FROM users WHERE user_id = $1 RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// 単位登録
+app.post("/api/units", async (req, res) => {
+  const { name, multiplier } = req.body;
+  try {
+    const result = await pool.query(
+      "INSERT INTO unit (name, multiplier) VALUES ($1, $2) RETURNING *",
+      [name, multiplier]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // ユニットの取得
-app.get("/api/unit", async (req, res) => {
+app.get("/api/units", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM unit");
     res.json(result.rows);
@@ -399,19 +487,51 @@ app.get("/api/unit", async (req, res) => {
   }
 });
 
+// ユニットの更新
+app.put("/api/units/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, multiplier } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE unit SET name = $1, multiplier = $2 WHERE unit_id = $3 RETURNING *",
+      [name, multiplier, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Unit not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ユニットの削除
+app.delete("/api/units/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "DELETE FROM unit WHERE unit_id = $1 RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Unit not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ストレージ登録
 app.post("/api/storage", async (req, res) => {
-  const {
-    storage_name,
-    total_capacity,
-    total_capacity_unit_id,
-    cloud_pool_id,
-  } = req.body;
-  console.log(req.body);
+  const { name, total_capacity, total_capacity_unit_id, cloud_pool_id } =
+    req.body;
   try {
     const result = await pool.query(
       "INSERT INTO storage_device (name, total_capacity, total_capacity_unit_id, cloud_pool_id) VALUES ($1, $2, $3, $4) RETURNING *",
-      [storage_name, total_capacity, total_capacity_unit_id, cloud_pool_id]
+      [name, total_capacity, total_capacity_unit_id, cloud_pool_id]
     );
     res.json(result.rows[0]);
   } catch (error) {
@@ -427,6 +547,43 @@ app.get("/api/storage", async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ストレージの更新
+app.put("/api/storage/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, version } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE storage SET name=$1, total_capacity=$2, total_capacity_unit_id=$3, cloud_pool_id=$4 WHERE storage_id=$5 RETURNING *",
+      [name, total_capacity, total_capacity_unit_id, cloud_pool_id, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Storage not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ストレージの削除
+app.delete("/api/storage/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "DELETE FROM storage WHERE storage_id = $1 RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Storage not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -456,18 +613,101 @@ app.get("/api/os", async (req, res) => {
   }
 });
 
+// OS の更新
+app.put("/api/os/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, version } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE operating_system SET name=$1, version=$2 WHERE os_id=$3 RETURNING *",
+      [name, version, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "OS not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// OS の削除
+app.delete("/api/os/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "DELETE FROM operating_system WHERE os_id = $1 RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "OS not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ディスクの登録
-app.post("/api/disk", async (req, res) => {
-  const { disk_name, storage_device_id, size, unit_id } = req.body;
+app.post("/api/disks", async (req, res) => {
+  const { name, storage_device_id, size, unit_id } = req.body;
+  console.log(req.body);
   try {
     const result = await pool.query(
       "INSERT INTO disk (disk_name, storage_device_id, size, unit_id) VALUES ($1, $2, $3, $4) RETURNING *",
-      [disk_name, storage_device_id, size, unit_id]
+      [name, storage_device_id, size, unit_id]
     );
     res.json(result.rows[0]);
   } catch (error) {
     console.error("Error creating disk:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ディスクの照会
+app.get("/api/disks", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM disk");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server Error");
+  }
+});
+
+// ディスクの更新
+app.put("/api/disks/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, size, unit_id, storage_id } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE disk SET name = $1, size = $2, unit_id = $3, storage_id = $4 WHERE disk_id = $5 RETURNING *",
+      [name, size, unit_id, storage_id, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server Error");
+  }
+});
+
+// ディスクの削除
+app.delete("/api/disks/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "DELETE FROM disk WHERE disk_id = $1 RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Disk not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
