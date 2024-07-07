@@ -117,8 +117,8 @@ app.put("/api/cloud-provider/:id", async (req, res) => {
 
 // データセンターの作成
 app.post("/api/data-center", async (req, res) => {
-  const { name, location, cloud_provider_id } = req.body;
-  const parsedProviderId = parseInt(cloud_provider_id, 10); // provider_idを整数に変換
+  const { name, location, provider_id } = req.body;
+  const parsedProviderId = parseInt(provider_id, 10); // provider_idを整数に変換
   console.log(parsedProviderId);
   if (isNaN(parsedProviderId)) {
     return res.status(400).json({ error: "Invalid provider_id" });
@@ -152,7 +152,7 @@ app.put("/api/data-center/:id", async (req, res) => {
   const { name, location, provider_id } = req.body;
   try {
     const result = await pool.query(
-      "UPDATE data_center SET name = $1, location = $2, provider_id = $3 WHERE id = $4 RETURNING *",
+      "UPDATE data_center SET name = $1, location = $2, provider_id = $3 WHERE data_center_id = $4 RETURNING *",
       [name, location, provider_id, id]
     );
     if (result.rows.length === 0) {
@@ -160,7 +160,7 @@ app.put("/api/data-center/:id", async (req, res) => {
     }
     res.status(200).json(result.rows[0]);
   } catch (err) {
-    console.error("Error updating data center:", err);
+    // console.error("Error updating data center:", err);
     res.status(500).send("Server error");
   }
 });
