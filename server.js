@@ -5,17 +5,19 @@ const { Pool } = require("pg");
 const bcrypt = require("bcryptjs"); // bcryptjsのインポートを追加
 const jwt = require("jsonwebtoken");
 const { provide } = require("vue");
+require("dotenv").config();
 
 const app = express();
+const port = 3001;
 app.use(bodyParser.json());
 app.use(cors());
 
 const pool = new Pool({
-  user: "postgres",
-  host: "localhost",
-  database: "cloud",
-  password: "postgres00",
-  port: 5433,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
 });
 
 app.get("/", (req, res) => res.send("Server is running."));
@@ -711,6 +713,6 @@ app.delete("/api/disks/:id", async (req, res) => {
   }
 });
 
-app.listen(3001, () => {
-  console.log("Server is running on port 3001");
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
