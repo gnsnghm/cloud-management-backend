@@ -345,6 +345,8 @@ app.put("/api/virtual-machines/:id", async (req, res) => {
     vlan,
   } = req.body;
 
+  console.log(req.body);
+
   try {
     const result = await pool.query(
       `UPDATE virtual_machine SET 
@@ -685,7 +687,7 @@ app.put("/api/disks/:id", async (req, res) => {
   const { name, size, unit_id, storage_id } = req.body;
   try {
     const result = await pool.query(
-      "UPDATE disk SET name = $1, size = $2, unit_id = $3, storage_id = $4 WHERE disk_id = $5 RETURNING *",
+      "UPDATE disk SET disk_name = $1, size = $2, unit_id = $3, storage_device_id = $4 WHERE disk_id = $5 RETURNING *",
       [name, size, unit_id, storage_id, id]
     );
     res.json(result.rows[0]);
