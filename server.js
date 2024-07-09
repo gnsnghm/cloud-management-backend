@@ -2,12 +2,17 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const apiKeyAuth = require("./middleware/apiKeyAuth");
+
 require("dotenv").config();
 
 const app = express();
 const port = 3001;
 app.use(bodyParser.json());
 app.use(cors());
+
+// すべてのルートでAPIキーを確認
+app.use(apiKeyAuth);
 
 // ルートファイルをインポート
 const authRoutes = require("./routes/auth");
