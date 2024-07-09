@@ -557,10 +557,12 @@ app.get("/api/storage", async (req, res) => {
 // ストレージの更新
 app.put("/api/storage/:id", async (req, res) => {
   const { id } = req.params;
-  const { name, version } = req.body;
+  const { name, total_capacity, total_capacity_unit_id, cloud_pool_id } =
+    req.body;
+  console.log(req.params);
   try {
     const result = await pool.query(
-      "UPDATE storage SET name=$1, total_capacity=$2, total_capacity_unit_id=$3, cloud_pool_id=$4 WHERE storage_id=$5 RETURNING *",
+      "UPDATE storage_device SET name=$1, total_capacity=$2, total_capacity_unit_id=$3, cloud_pool_id=$4 WHERE storage_device_id=$5 RETURNING *",
       [name, total_capacity, total_capacity_unit_id, cloud_pool_id, id]
     );
     if (result.rows.length === 0) {
@@ -656,12 +658,12 @@ app.delete("/api/os/:id", async (req, res) => {
 
 // ディスクの登録
 app.post("/api/disks", async (req, res) => {
-  const { name, storage_device_id, size, unit_id } = req.body;
+  const { name, storage_id, size, unit_id } = req.body;
   console.log(req.body);
   try {
     const result = await pool.query(
       "INSERT INTO disk (disk_name, storage_device_id, size, unit_id) VALUES ($1, $2, $3, $4) RETURNING *",
-      [name, storage_device_id, size, unit_id]
+      [name, storage_id, size, unit_id]
     );
     res.json(result.rows[0]);
   } catch (error) {
